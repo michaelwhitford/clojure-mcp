@@ -1,70 +1,70 @@
 (ns clojure-mcp.agent.langchain
   (:require
-   [clojure.data.json :as json]
-   [clojure-mcp.agent.langchain.schema :as schema]
-   [clojure.tools.logging :as log]
-   [clojure.string :as string])
+    [clojure-mcp.agent.langchain.schema :as schema]
+    [clojure.data.json :as json]
+    [clojure.string :as string]
+    [clojure.tools.logging :as log])
   (:import
-   ;; LangChain4j Core and Service classes
-   [dev.langchain4j.service AiServices MemoryId]
-   [dev.langchain4j.agent.tool ToolSpecification #_ToolParameter]
-   [dev.langchain4j.service.tool ToolExecutor ToolExecution]
-   [dev.langchain4j.service TokenStream]
-   [dev.langchain4j.data.message SystemMessage UserMessage TextContent ]
-   [dev.langchain4j.agent.tool ToolExecutionRequest]
-   [dev.langchain4j.model.chat.request.json JsonObjectSchema]
-   [dev.langchain4j.memory ChatMemory]
-   [dev.langchain4j.memory.chat MessageWindowChatMemory]
-   [dev.langchain4j.model.chat.request ChatRequest ToolChoice]
-
+    [dev.langchain4j.agent.tool ToolExecutionRequest]
+    [dev.langchain4j.agent.tool ToolSpecification #_ToolParameter]
+    [dev.langchain4j.data.message SystemMessage UserMessage TextContent ]
+    [dev.langchain4j.memory ChatMemory]
+    [dev.langchain4j.memory.chat MessageWindowChatMemory]
    ;; LangChain4j Model classes (using Anthropic as an example)
-   [dev.langchain4j.model.anthropic
-    AnthropicChatModel
-    AnthropicStreamingChatModel
-    AnthropicChatModelName]
-   [dev.langchain4j.model.googleai
-    GoogleAiGeminiChatModel]
-   [java.util.function Consumer Function]
+    [dev.langchain4j.model.anthropic
+     AnthropicChatModel
+     AnthropicStreamingChatModel
+     AnthropicChatModelName]
+    [dev.langchain4j.model.chat.request ChatRequest ToolChoice]
+    [dev.langchain4j.model.chat.request.json JsonObjectSchema]
+    [dev.langchain4j.model.googleai
+     GoogleAiGeminiChatModel]
+    [dev.langchain4j.model.openai
+     OpenAiChatModel
+     OpenAiChatRequestParameters
+     OpenAiChatModelName]
 
-   [dev.langchain4j.model.openai
-    OpenAiChatModel
-    OpenAiChatRequestParameters
-    OpenAiChatModelName]
-   
+   ;; LangChain4j Core and Service classes
+    [dev.langchain4j.service AiServices MemoryId]
+    [dev.langchain4j.service TokenStream]
+    [dev.langchain4j.service.tool ToolExecutor ToolExecution]
+
    ;; Java Time API
-   [java.time LocalTime LocalDate ZoneId]))
+    [java.time LocalTime LocalDate ZoneId]
+
+    [java.util.function Consumer Function]))
 
 (def default-max-memory 100)
 
 #_(defn create-model-claude-3-7 []
-  (-> (AnthropicChatModel/builder)
-      (.apiKey (System/getenv "ANTHROPIC_API_KEY"))
-      (.modelName AnthropicChatModelName/CLAUDE_3_7_SONNET_20250219)
-      #_(.modelName AnthropicChatModelName/CLAUDE_3_5_SONNET_20241022)
-      (.logRequests true)
-      (.logResponses true)))
+    (-> (AnthropicChatModel/builder)
+        (.apiKey (System/getenv "ANTHROPIC_API_KEY"))
+        (.modelName AnthropicChatModelName/CLAUDE_3_7_SONNET_20250219)
+        #_(.modelName AnthropicChatModelName/CLAUDE_3_5_SONNET_20241022)
+        (.logRequests true)
+        (.logResponses true)))
 
 #_(defn create-model-claude-3-5 []
-  (-> (AnthropicChatModel/builder)
-      (.apiKey (System/getenv "ANTHROPIC_API_KEY"))
-      (.modelName AnthropicChatModelName/CLAUDE_3_5_SONNET_20241022)
-      #_(.modelName AnthropicChatModelName/CLAUDE_3_5_SONNET_20241022)
-      (.logRequests true)
-      (.logResponses true)))
+    (-> (AnthropicChatModel/builder)
+        (.apiKey (System/getenv "ANTHROPIC_API_KEY"))
+        (.modelName AnthropicChatModelName/CLAUDE_3_5_SONNET_20241022)
+        #_(.modelName AnthropicChatModelName/CLAUDE_3_5_SONNET_20241022)
+        (.logRequests true)
+        (.logResponses true)))
 
 #_(defn create-model-gemini []
-  (-> (GoogleAiGeminiChatModel/builder)
-      (.apiKey (System/getenv "GEMINI_API_KEY"))
-      (.modelName "gemini-2.5-pro-preview-03-25")
-      #_(.logRequests true)
-      #_(.logResponses true)))
+    (-> (GoogleAiGeminiChatModel/builder)
+        (.apiKey (System/getenv "GEMINI_API_KEY"))
+        (.modelName "gemini-2.5-pro-preview-03-25")
+        #_(.logRequests true)
+        #_(.logResponses true)))
 
 #_(defn create-model-gemini-2-0-flash []
-  (-> (GoogleAiGeminiChatModel/builder)
-      (.apiKey (System/getenv "GEMINI_API_KEY"))
-      (.modelName "gemini-2.0-flash")
-      #_(.logRequests true)
-      #_(.logResponses true)))
+    (-> (GoogleAiGeminiChatModel/builder)
+        (.apiKey (System/getenv "GEMINI_API_KEY"))
+        (.modelName "gemini-2.0-flash")
+        #_(.logRequests true)
+        #_(.logResponses true)))
 
 ;; simple API as we don't really need more right now
 
@@ -77,7 +77,8 @@
 (defn create-openai-model [model-name]
   (-> (OpenAiChatModel/builder)
       (.apiKey (System/getenv "OPENAI_API_KEY"))
-      (.modelName model-name)))
+      (.baseUrl "http://192.168.50.2:5000/v1")
+      (.modelName "qwen3-32b")))
 
 ;; reasoning not supported yet??
 ;; Langchain Anthropic client is unstable, using OPENAI api is better but
@@ -89,7 +90,7 @@
       (.modelName model-name)))
 
 (defn default-request-parameters [model-builder configure-fn]
-   (.defaultRequestParameters model-builder
+  (.defaultRequestParameters model-builder
     (.build (configure-fn (OpenAiChatRequestParameters/builder)))))
 
 (defn reasoning-effort [request-params-builder reasoning-effort]
@@ -148,14 +149,14 @@
                                                    :arg-result (:result arg-result)})))
             (let [callback-result (promise)]
               (tool-fn nil
-                       (:result arg-result)
-                       (fn [result error]
-                         (deliver callback-result
-                                  (if error
-                                    (str "Tool Error: " (string/join "\n" result))
-                                    (if (sequential? result)
-                                      (string/join "\n\n" result)
-                                      (str result))))))
+                (:result arg-result)
+                (fn [result error]
+                  (deliver callback-result
+                    (if error
+                      (str "Tool Error: " (string/join "\n" result))
+                      (if (sequential? result)
+                        (string/join "\n\n" result)
+                        (str result))))))
               @callback-result)
             (catch Exception e
               (str "Error executing tool '" tool-name "': " (.getMessage e)
@@ -169,28 +170,28 @@
       (.name name)
       (.description description)
       (.parameters (schema/edn->sch
-                    (if (string? schema)
-                      (json/read-str schema :key-fn keyword)
-                      schema)))
+                     (if (string? schema)
+                       (json/read-str schema :key-fn keyword)
+                       schema)))
       (.build)))
 
 (defn convert-tools [registration-maps]
   (into {}
-        (map (juxt registration-map->tool-specification
-                   registration-map->tool-executor)
-             registration-maps)))
+    (map (juxt registration-map->tool-specification
+           registration-map->tool-executor)
+      registration-maps)))
 
 (defn chat-request [message & {:keys [system-message tools require-tool-choice]}]
   ;; ChatResponse response = model.chat(request);
   ;;AiMessage aiMessage = response.aiMessage();
   (cond-> (ChatRequest/builder)
-    system-message (.messages (list (SystemMessage. system-message)
-                                    (UserMessage. message)))
-    (not system-message) (.messages (list (UserMessage. message)))
-    (not-empty tools) (.toolSpecifications (map registration-map->tool-specification tools))
+          system-message (.messages (list (SystemMessage. system-message)
+                                      (UserMessage. message)))
+          (not system-message) (.messages (list (UserMessage. message)))
+          (not-empty tools) (.toolSpecifications (map registration-map->tool-specification tools))
     ;; TODO on next langchain bump
     ;; require-tool-choice (.toolChoice ToolChoice/REQUIRED)
-    :else (.build)))
+          :else (.build)))
 
 (definterface AiService
   (^String chat [^String userMessage])
@@ -200,11 +201,11 @@
   (-> (AiServices/builder klass) ; Use the interface defined above
       (.chatModel model)
       (.systemMessageProvider
-       (reify Function
-         (apply [this mem-id]
-           system-message)))
+        (reify Function
+          (apply [this mem-id]
+            system-message)))
       (cond->
-       tools (.tools (convert-tools tools)))
+        tools (.tools (convert-tools tools)))
       (.chatMemory memory)))
 
 (comment
@@ -220,18 +221,17 @@
      :tool-fn (fn [_ {:keys [nm]} callback]
                 (callback [(str "Hello " nm "!")] false))})
   #_(create-service AiService {})
-  
+
   (let [exec (registration-map->tool-executor test-tool)]
     (.execute exec (-> (ToolExecutionRequest/builder)
                        (.name "hello")
                        (.arguments (json/json-str {:nm "Joey"}))
                        (.build))
-              "asdf"))
-  
+      "asdf"))
+
   )
 
 ;; keep this example
 #_(definterface StreamingAiService
     (^dev.langchain4j.service.TokenStream chat [^String userMessage])
     (^dev.langchain4j.service.TokenStream chat [^dev.langchain4j.data.message.UserMessage userMessage]))
-
