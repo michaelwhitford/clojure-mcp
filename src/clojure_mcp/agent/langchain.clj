@@ -30,7 +30,7 @@
     [dev.langchain4j.service.tool ToolExecutor ToolExecution]
 
    ;; Java Time API
-    [java.time LocalTime LocalDate ZoneId]
+    [java.time LocalTime LocalDate ZoneId Duration]
 
     [java.util.function Consumer Function]))
 
@@ -78,6 +78,7 @@
   (-> (OpenAiChatModel/builder)
       (.apiKey (System/getenv "OPENAI_API_KEY"))
       (.baseUrl "http://192.168.50.2:5000/v1")
+      (.timeout (Duration/ofSeconds 900))
       (.modelName "qwen3-32b")))
 
 ;; reasoning not supported yet??
